@@ -1,6 +1,6 @@
 # Benchmark & Observability Report — Day 14
 
-**Họ tên:** Duong Minh Tan — 2A202603464
+**Họ tên:** Dương Minh Tân — 2A202603464
 **Ngày chạy:** 2026-11-25
 **Môi trường:** Windows 11 laptop, Python 3.12 (venv), Docker Desktop (Docker 29.7.2). Load test và agent chạy cùng máy.
 
