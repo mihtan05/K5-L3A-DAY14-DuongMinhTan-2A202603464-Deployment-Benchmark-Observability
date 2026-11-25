@@ -80,12 +80,23 @@ v2 tốn gấp ~1.9 lần token/câu (56.7 → 108.8) và tổng cost gấp ~1.9
 
 ## 4. Observability stack (production)
 
+### 4.0 Exercise 7.4 — đọc dashboard ở trạng thái bình thường
+
+Đo bằng Prometheus API khi Locust headless chạy 30 user (ramp 5) với cấu hình mặc định, 2 instance agent (cửa sổ `rate(...[1m])` lúc ~140 s):
+
+| Câu | Kết quả đo | Giải thích |
+|---|---|---|
+| 1. p95 và avg | p95 = **296 ms**, avg = **244 ms** (error rate 0.79%) | Khoảng cách ~50 ms còn nhỏ vì đa số request ~200 ms; p95 bị kéo lên bởi số ít request chậm (3% chậm ~1.7 s). Khoảng cách p95/p99 với avg càng lớn thì tail latency càng nặng, avg che mất điều đó |
+| 2. Requests/s theo instance | 172.21.0.4: **9.22 req/s**, 172.21.0.6: **9.24 req/s** | Nginx chia gần như đều (round-robin, lệch < 0.3%) |
+| 3. Input vs output tokens/s | input **1433 tok/s**, output **756 tok/s** | Input = system prompt + ngữ cảnh lấy từ retrieval + câu hỏi, nên dài hơn câu trả lời ngắn của model. Vì giá output đắt hơn input (0.0006 vs 0.00015 USD/1K), cost vẫn chủ yếu do output |
+| 4. `curl http://localhost:8080/metrics` | **HTTP 404** | `nginx.conf` có `location = /metrics` chặn đường này: metrics chỉ cho Prometheus scrape trực tiếp từng agent trong mạng nội bộ, không public ra ngoài vì lộ thông tin nội bộ (route, model, chi phí) và tốn tài nguyên |
+
 ### 4.1 Screenshot
 
-- [ ] Dashboard Grafana khi đang có tải (thấy rõ Golden Signals)
-- [ ] Một trace chậm trong Jaeger (thấy span nào chiếm thời gian)
-- [ ] Một trace lỗi trong Jaeger (có event `exception`)
-- [ ] Trang Alerts của Prometheus với ít nhất 1 alert đang **firing**
+- [x] Dashboard Grafana khi đang có tải (thấy rõ Golden Signals) — `screenshots/grafana-dashboard.png` (chụp lúc chạy thí nghiệm A–D: error rate 19.61%, p95 1.92 s, instances up 2)
+- [x] Một trace chậm trong Jaeger (thấy span nào chiếm thời gian) — `screenshots/jaeger-slow-trace.png`
+- [x] Một trace lỗi trong Jaeger (có event `exception`) — `screenshots/jaeger-error-trace.png` (span lỗi có dấu đỏ; event `exception` xác nhận qua Jaeger API, xem 4.3)
+- [x] Trang Alerts của Prometheus với ít nhất 1 alert đang **firing** — `screenshots/prometheus-alert-firing.png` (4 alert cùng firing)
 
 ### 4.2 Thí nghiệm "phá hệ thống"
 
@@ -95,7 +106,7 @@ v2 tốn gấp ~1.9 lần token/câu (56.7 → 108.8) và tổng cost gấp ~1.9
 | B | `MOCK_SLOW_RATE=0.3` | `AgentHighLatencyP95` | pending +15 s, **firing ≈ 143 s** (`for: 2m`) | p95/p99 theo thời gian vọt lên ~2 s, avg tăng ít hơn |
 | C | `LLM_MODEL=mock-llm-large` | `LLMCostBurnRateHigh` | Không đo được: alert **đã firing từ 08:28:32 UTC**, trước lúc đổi model, do tải 100 user của benchmark scale (cost > $2/giờ ngay cả với model small) | Cost USD/giờ, LLM p95 (model large chậm hơn) |
 | D | `docker pause k5-day14-observability-agent-1` | `AgentInstanceDown` | **firing ≈ 45 s** sau khi pause (`for: 30s` + chu kỳ scrape/evaluate) | Instances up giảm 3 → 2; panel Error rate của agent không thấy lỗi 504 của Nginx |
-| E | `AGENT_VERSION=v1` | | | |
+| E | `AGENT_VERSION=v1` | **Không có.** Sau khi chuyển sang v1 (15:50:00), 3 alert hạ tầng tự hết; từ 15:54:58 trang Alerts trống | — | Bảng "Phiên bản đang chạy" đổi sang v1; Retrieval hit ratio không còn dữ liệu (`agent_retrieval_total` không tăng); tokens/s giảm (input 563/s, output 308/s). Error rate 0.77%, p95 199 ms, toàn bộ xanh |
 
 Cách làm: giữ Locust 30 user chạy nền; lúc 08:32:30 UTC đổi `.env` thành `MOCK_ERROR_RATE=0.2`, `MOCK_SLOW_RATE=0.3`, `LLM_MODEL=mock-llm-large` rồi `docker compose -p k5-day14-observability up -d --scale agent=3`; 8 s sau (T0 = 08:32:38 UTC) `docker pause` agent-1. Một script poll `GET /api/v1/alerts` của Prometheus mỗi 5 s và ghi thời điểm đầu tiên mỗi alert chuyển trạng thái (so với T0; thời gian A, B trong bảng đã cộng 8 s từ lúc đổi `.env`):
 
@@ -113,7 +124,10 @@ Cả 4 alert cùng firing lúc chụp `screenshots/prometheus-alert-firing.png`.
 
 **Thí nghiệm E không làm alert nào firing. Bạn sẽ phát hiện loại sự cố này trong production bằng cách nào?**
 
-...
+Lỗi chất lượng không làm hạ tầng đỏ: v1 trả lời nhanh, ít lỗi, nhưng chỉ đúng 4.3% (`reports/eval_v1.json`). Cách phát hiện:
+1. **Chặn trước khi deploy:** quality gate trong CI (`.github/workflows/eval-gate.yml`) chạy golden dataset; accuracy giảm hoặc có regression thì exit code 1 và không cho merge/deploy.
+2. **Giám sát chất lượng khi chạy:** alert trên metric gián tiếp như retrieval hit ratio thấp hoặc không có dữ liệu (`absent(rate(agent_retrieval_total{result="hit"}[5m]))`), tokens/câu giảm đột ngột, hoặc phiên bản lạ trong `agent_info`.
+3. **Eval online:** định kỳ (vd mỗi 15 phút) chạy một phần golden dataset vào production làm synthetic check, thêm feedback người dùng (thumbs up/down) và LLM-as-judge trên mẫu request thật; đẩy kết quả thành metric để có alert.
 
 ### 4.3 Debug bằng trace
 
@@ -169,9 +183,13 @@ Nguồn: hàng `POST,/ask` trong `benchmark-results/scale_1_stats.csv` và `scal
 ## 6. Kết luận
 
 - 3 điều bạn học được về benchmark & observability:
-  1. ...
-  2. ...
-  3. ...
+  1. **Average nói dối, percentile thì không:** 3% request chậm đẩy p99 từ 500 lên 1720 ms trong khi avg chỉ tăng 18%. SLO phải đặt theo p95/p99.
+  2. **Phải biết giới hạn của chính bài đo:** RPS không đổi khi scale 1 → 3 vì Locust closed-loop đã chạm trần ~66 req/s; lần chạy đầu 100% lỗi 502 do container không khởi động, nên luôn kiểm tra stack khoẻ trước khi tin số liệu.
+  3. **Metric, trace, log phải nối với nhau:** dashboard cho biết *có* vấn đề, trace cho biết *ở đâu* (97% thời gian nằm ở span LLM), log có cùng `trace_id` cho biết *vì sao*. Còn lỗi chất lượng thì cả ba đều không thấy, chỉ eval mới bắt được.
 - Nếu đưa agent này lên production thật, bạn sẽ thêm metric / alert nào nữa?
 
-...
+- **Giám sát tầng Nginx / synthetic check từ bên ngoài:** thí nghiệm D cho thấy lỗi 504 ở load balancer không hiện trong metric của agent.
+- **Alert chất lượng:** retrieval hit ratio thấp hoặc mất dữ liệu, accuracy của eval định kỳ dưới ngưỡng.
+- **Error budget burn rate** (multi-window, vd 1h + 6h) thay cho ngưỡng error rate cố định, để ít báo nhầm hơn.
+- **Cost theo user/API key và budget còn lại** (khớp với cost guard của Part 6), alert khi một key tiêu bất thường.
+- **Readiness/Redis:** alert khi `/ready` trả 503 kéo dài hoặc Redis latency cao, vì rate limit và cost guard phụ thuộc Redis.
