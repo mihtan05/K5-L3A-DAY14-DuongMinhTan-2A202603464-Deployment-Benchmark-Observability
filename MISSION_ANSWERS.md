@@ -275,16 +275,36 @@ Total messages: 10
 
 ## Part 6: Final Project — output `check_production_ready.py`
 
-_(sẽ dán output `PASS 12/12` chạy trong WSL2 — xem ghi chú bên dưới)_
-
-Lần chạy trên Windows (Docker có bật) — 11/12, 42/42 checks đạt; tiêu chí 11 ⚠️ chỉ vì Windows không gửi được SIGTERM (phần `docker stop` của tiêu chí 11 đã ✅):
+Chạy bản đầy đủ (có Docker) trong môi trường Linux (`os.name = posix`): container `python:3.11-slim` có Docker CLI + Compose v2.29.7 nối vào Docker Desktop qua `/var/run/docker.sock`, `--network host`. Script chấm **không sửa**, chạy trong `06-lab-complete/`:
 
 ```text
+$ python check_production_ready.py
+     ✅ Docker: image < 500 MB — 63 MB
+     ✅ Khi chạy: vượt giới hạn → 429 — 429 sau 5 request thành công (RATE_LIMIT_PER_MINUTE=5)
+     ✅ Khi chạy: hết budget → 402 — 402 ở request thứ 1
+     ✅ Khi chạy: mọi dòng log của app là JSON hợp lệ — 12 dòng JSON
+     ✅ Khi chạy: SIGTERM lúc đang có request → request vẫn 200, process tự thoát — exit code 0
+     ✅ Docker: `docker stop` tắt êm (exit code 0, < 10s) — exit code 0, 0.5s
+...
   📋 Checklist Deliverable
-     ⚠️  Graceful shutdown
+     ✅ Dockerfile (multi-stage, < 500 MB)
+     ✅ docker-compose.yml (agent + redis)
+     ✅ .dockerignore
+     ✅ Health check endpoint (GET /health)
+     ✅ Readiness endpoint (GET /ready)
+     ✅ API Key authentication
+     ✅ Rate limiting
+     ✅ Cost guard
+     ✅ Config từ environment variables
+     ✅ Structured logging
+     ✅ Graceful shutdown
+     ✅ Public URL ready (Railway / Render config)
 ----------------------------------------------------------------
-  Result: 11/12 tiêu chí đạt · 42/42 checks passed
+  Result: 12/12 tiêu chí đạt · 43/43 checks passed
+  🎉 PASS 12/12 — PRODUCTION READY! Deploy nào!
 ```
+
+Trên Windows (Python Windows) cùng code đạt 11/12: tiêu chí 11 ⚠️ vì Windows không gửi được SIGTERM, đúng như README cảnh báo. `--public-url https://agent-production-0fad661a.up.railway.app` → `/health` 200 ✅.
 
 ---
 
@@ -298,4 +318,5 @@ Lần chạy trên Windows (Docker có bật) — 11/12, 42/42 checks đạt; ti
 | 4 | Chạy ví dụ Part 1, 2, 4, 5 và soạn câu trả lời | Output lệnh + bản nháp câu trả lời | Đọc lại code nguồn từng Part, kiểm từng dòng code được trích |
 | 5 | Chạy stack observability, benchmark scale, thí nghiệm phá hệ thống | Phát hiện lần chạy đầu 100% lỗi 502 do `production/Dockerfile` thiếu `PYTHONUSERBASE`; sửa 1 dòng, chạy lại | Xem log container (`ModuleNotFoundError: uvicorn`), gọi thử `/ask` trả 200 rồi mới benchmark lại; thời gian alert đo bằng script poll Prometheus API |
 | 7 | Deploy Railway (sau khi tôi tự `railway login`) | AI chạy `railway init/add/up/domain`, sinh `AGENT_API_KEY` ngẫu nhiên đặt thẳng trên Railway | Chạy 4 lệnh CP6 (200/200/401/200), thử 429 trên cloud, `check_production_ready.py --public-url` ✅ |
+| 8 | Chạy script chấm bản đầy đủ trên Linux | AI chạy script (không sửa) trong container `python:3.11-slim` có Docker CLI/Compose nối vào Docker Desktop, vì Python Windows không gửi được SIGTERM | Kết quả `PASS 12/12 · 43/43 checks` |
 | 6 | Chụp 4 ảnh Part 7 | AI chụp bằng Chrome headless (Prometheus Alerts, Grafana, 2 trace Jaeger) | Mở từng ảnh kiểm tra: 4 alert FIRING, số ms của trace khớp Jaeger API và log JSON |
