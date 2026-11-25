@@ -120,7 +120,8 @@ HTTP/1.1 200 OK
 
 ### Exercise 3.1: Railway (deploy agent Part 6)
 
-- URL: _(điền sau khi deploy — xem `DEPLOYMENT.md`)_
+- URL: https://agent-production-0fad661a.up.railway.app (agent Part 6 + Railway Redis; chi tiết và output test trong `DEPLOYMENT.md`)
+- 4 lệnh tự kiểm CP6: `/health` 200, `/ready` 200, `/ask` không key 401, có key 200; rate limit trên cloud trả 429 sau 10 request/phút
 - Screenshot: `screenshots/dashboard.png`, `screenshots/running.png`, `screenshots/test.png`
 
 ### So sánh `railway.toml` và `render.yaml` (trong `06-lab-complete/`)
@@ -296,4 +297,5 @@ Lần chạy trên Windows (Docker có bật) — 11/12, 42/42 checks đạt; ti
 | 3 | Chạy load test, eval, sửa `KNOWLEDGE_BASE` cho 2 câu sai | Số đo trong `reports/*.json`, thêm 2 entry KB (JWT, HPA) | Eval cuối 23/23 PASS; số trong `BENCHMARK_REPORT.md` trích thẳng từ JSON |
 | 4 | Chạy ví dụ Part 1, 2, 4, 5 và soạn câu trả lời | Output lệnh + bản nháp câu trả lời | Đọc lại code nguồn từng Part, kiểm từng dòng code được trích |
 | 5 | Chạy stack observability, benchmark scale, thí nghiệm phá hệ thống | Phát hiện lần chạy đầu 100% lỗi 502 do `production/Dockerfile` thiếu `PYTHONUSERBASE`; sửa 1 dòng, chạy lại | Xem log container (`ModuleNotFoundError: uvicorn`), gọi thử `/ask` trả 200 rồi mới benchmark lại; thời gian alert đo bằng script poll Prometheus API |
+| 7 | Deploy Railway (sau khi tôi tự `railway login`) | AI chạy `railway init/add/up/domain`, sinh `AGENT_API_KEY` ngẫu nhiên đặt thẳng trên Railway | Chạy 4 lệnh CP6 (200/200/401/200), thử 429 trên cloud, `check_production_ready.py --public-url` ✅ |
 | 6 | Chụp 4 ảnh Part 7 | AI chụp bằng Chrome headless (Prometheus Alerts, Grafana, 2 trace Jaeger) | Mở từng ảnh kiểm tra: 4 alert FIRING, số ms của trace khớp Jaeger API và log JSON |
