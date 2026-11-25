@@ -1,0 +1,27 @@
+# Quality gate (Exercise 7.3): PR nào làm accuracy < 100% hoặc gây regression so với baseline thì đỏ.
+# Đặt check "eval-gate" là required trong branch protection để chặn merge.
+name: eval-gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  eval-gate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 06-lab-complete/benchmark-observability/develop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Start agent v2
+        run: |
+          AGENT_VERSION=v2 PORT=8002 nohup python app.py > agent.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8002/health && break; sleep 1; done
+      - name: Eval — exit code 1 khi quality gate FAIL làm job fail
+        run: python eval/run_eval.py --url http://localhost:8002 --min-accuracy 1.0 --baseline ../../../reports/eval_v2.json
