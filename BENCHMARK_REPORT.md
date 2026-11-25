@@ -122,6 +122,8 @@ Cách làm: giữ Locust 30 user chạy nền; lúc 08:32:30 UTC đổi `.env` t
 
 Cả 4 alert cùng firing lúc chụp `screenshots/prometheus-alert-firing.png`. Thời gian tới lúc firing ≈ thời gian `for` của rule + tối đa một chu kỳ scrape/evaluate (15 s) + thời gian cửa sổ `rate()` tích đủ dữ liệu xấu.
 
+**Thí nghiệm D — vì sao lỗi 504 không hiện trên metric của agent, và vì sao dùng `docker pause`:** khi agent-1 bị pause, request Nginx gửi tới nó treo tới `proxy_read_timeout` rồi Nginx trả 504. Request đó chưa bao giờ được agent xử lý xong nên không có trong `http_requests_total` của agent, vì vậy panel Error rate (đo từ phía agent) không thấy lỗi này. Metric chỉ phản ánh những gì chính service đó nhìn thấy, nên production cần thêm metric ở tầng load balancer hoặc synthetic check từ bên ngoài. Dùng `pause` mà không dùng `stop` vì container bị stop biến mất khỏi Docker DNS: Prometheus (`dns_sd_configs`) coi như target không tồn tại, không phải down, nên không có `up == 0` để alert. Container bị pause vẫn còn trong DNS nhưng không trả lời scrape, nên `up == 0` và `AgentInstanceDown` firing.
+
 **Thí nghiệm E không làm alert nào firing. Bạn sẽ phát hiện loại sự cố này trong production bằng cách nào?**
 
 Lỗi chất lượng không làm hạ tầng đỏ: v1 trả lời nhanh, ít lỗi, nhưng chỉ đúng 4.3% (`reports/eval_v1.json`). Cách phát hiện:
