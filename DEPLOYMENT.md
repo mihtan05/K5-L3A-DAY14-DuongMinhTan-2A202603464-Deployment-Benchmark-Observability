@@ -75,6 +75,8 @@ Rate limit trên cloud (cùng một key, 12 request liên tiếp, `RATE_LIMIT_PE
 
 ## Screenshots
 
-- `screenshots/dashboard.png` — Railway dashboard (project `day14-agent`: service agent + Redis)
-- `screenshots/running.png` — service `agent` đang chạy (deployment Active)
+- `screenshots/dashboard.png` — project `day14-agent` qua Railway CLI (`railway status`, `railway service list`): service `agent` và `Redis` đều ● Online; danh sách **tên** biến môi trường đặt trên Railway (không in giá trị)
+- `screenshots/running.png` — deployment của `agent` trạng thái SUCCESS, log runtime trên Railway (request `/health`, `/ready`, `/ask` 401/200) và `curl` `/health`, `/ready` trả 200 lúc 09:48 UTC
+
+> Hai ảnh trên chụp output của Railway CLI (đăng nhập bằng tài khoản của tôi, dữ liệu lấy từ Railway API), không phải giao diện web; tên tài khoản đã được che.
 - `screenshots/test.png` — kết quả 4 lệnh test ở trên
